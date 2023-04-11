@@ -16,9 +16,15 @@ public class GameController : MonoBehaviour
     [SerializeField] private Transform transformMapObjectsParent;
     [SerializeField] private GameObject uiContentMenu;
     [SerializeField] private GameObject uiContentGame;
+    [SerializeField] private MapObject mapObjectPrefab;
     [SerializeField] private Image imageCurrentTileType;
+    [SerializeField] private Color[] colorCurrentTileType;
     [SerializeField] private TileType[] tileTypes;
-    [SerializeField] private MapObject[] objectPrefabs;
+    [SerializeField] private Mesh[] objectMeshes;
+    [SerializeField] private Material[] objectMaterials;
+    [SerializeField] private Vector3[] objectOffsets;
+    [SerializeField] private Vector3[] objectScales;
+    [SerializeField] private Vector3[] objectRotations;
 
     private int currentTileTypeIndex;
     private Vector2 mouseWorldPosition;
@@ -35,7 +41,7 @@ public class GameController : MonoBehaviour
             {
                 for (var z = 0; z < mapSizeZ; ++z)
                 {
-                    mapObjects[x, y, z] = Instantiate(objectPrefabs[0], transformMapObjectsParent);
+                    mapObjects[x, y, z] = Instantiate(mapObjectPrefab, transformMapObjectsParent);
                     mapObjects[x, y, z].Initialize(x, y, z);
                 }
             }
@@ -122,6 +128,7 @@ public class GameController : MonoBehaviour
                         }
                     } break;
                 case TileType.Forest:
+                case TileType.House:
                 case TileType.Stone: return false;
             }
             prevTileType = mapData[x, y, z];
@@ -174,6 +181,7 @@ public class GameController : MonoBehaviour
             currentTileTypeIndex = tileTypes.Length - 1;
 
       //  imageCurrentTileType.sprite = tiles[currentTileTypeIndex].sprite;
+        imageCurrentTileType.color = colorCurrentTileType[currentTileTypeIndex];
     }
 
     public void OnClickPlayButton() => SetGameState(GameState.Active);
@@ -229,14 +237,10 @@ public class GameController : MonoBehaviour
         }
         else
         {
+            int rand = Random.Range(0, 4);
+            var objectType = (int)mapData[x, y, z];
             mapObjects[x, y, z].SetVisualsActive(true);
-
-            switch (mapData[x, y, z])
-            {
-                case TileType.Ground:
-                case TileType.Forest:
-                case TileType.Stone: break;// tileMap.SetTile(tileVector, tiles[(int)mapData[x, y, z]]); break;
-            }
+            mapObjects[x, y, z].SetVisuals(objectMeshes[objectType], objectMaterials[objectType], objectOffsets[objectType], objectScales[objectType], Quaternion.Euler(objectRotations[objectType]));
         }
     }
 }

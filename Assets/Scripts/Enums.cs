@@ -11,9 +11,9 @@ public enum GameState
 public enum TileType
 {
     Empty = 0,
-    Water,
     Ground,
     Forest,
+    House,
     Stone
 }
 

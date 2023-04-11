@@ -25,9 +25,12 @@ public class MapObject : MonoBehaviour
         objectVisual.SetActive(value);
     }
 
-    public void SetVisuals(Mesh mesh, Material material)
+    public void SetVisuals(Mesh mesh, Material material, Vector3 visualOffset, Vector3 scale, Quaternion rotation)
     {
         meshFilter.mesh = mesh;
         meshRenderer.material = material;
+        objectVisual.transform.localPosition = visualOffset;
+        objectVisual.transform.localScale = scale;
+        objectVisual.transform.rotation = rotation;
     }
 }
