@@ -4,7 +4,8 @@ using UnityEngine;
 public enum GameState
 {
     Menu,
-    Active
+    Active,
+    GameOver
 }
 
 [System.Serializable]
@@ -14,7 +15,9 @@ public enum TileType
     Ground,
     Forest,
     House,
-    Stone
+    Stone,
+    Field,
+    Sand
 }
 
 [System.Serializable]

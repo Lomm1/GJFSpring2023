@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class GameController : MonoBehaviour
 {
@@ -10,13 +11,23 @@ public class GameController : MonoBehaviour
     public int mapSizeX;
     public int mapSizeY;
     public int mapSizeZ;
-    public TileType[,,] mapData;
-    public MapObject[,,] mapObjects;
+    public int secondsInYear;
+    public int currentYear;
+    public int maxYears;
+    public int waterRiseYears;
+    public int waterLevel;
+    public int energy;
+    public int energyPerLevel;
 
     [SerializeField] private Transform transformMapObjectsParent;
     [SerializeField] private GameObject uiContentMenu;
-    [SerializeField] private GameObject uiContentGame;
+    [SerializeField] private GameObject uiContentGameActive;
+    [SerializeField] private GameObject uiContentGameOver;
     [SerializeField] private MapObject mapObjectPrefab;
+    [SerializeField] private TextMeshProUGUI textTimer;
+    [SerializeField] private TextMeshProUGUI textYear;
+    [SerializeField] private TextMeshProUGUI textEnergy;
+    [SerializeField] private GameObject water;
     [SerializeField] private Image imageCurrentTileType;
     [SerializeField] private Color[] colorCurrentTileType;
     [SerializeField] private TileType[] tileTypes;
@@ -26,8 +37,13 @@ public class GameController : MonoBehaviour
     [SerializeField] private Vector3[] objectScales;
     [SerializeField] private Vector3[] objectRotations;
 
+    private float timer;
+    private int previousSecond;
     private int currentTileTypeIndex;
     private Vector2 mouseWorldPosition;
+
+    private TileType[,,] mapData;
+    private MapObject[,,] mapObjects;
 
     private void Awake()
     {
@@ -47,8 +63,7 @@ public class GameController : MonoBehaviour
             }
         }
 
-        SetAllMapData(TileType.Ground);
-        DrawAllMap();
+        ResetGame();
 
         SetGameState(gameState);
         SetCurrentTileIndex((int)TileType.Ground);
@@ -56,6 +71,9 @@ public class GameController : MonoBehaviour
 
     private void Update()
     {
+        if (gameState != GameState.Active)
+            return;
+
         if (Input.GetMouseButtonDown(0))
         {
             var inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
@@ -103,6 +121,22 @@ public class GameController : MonoBehaviour
         {
             SetCurrentTileIndex(--currentTileTypeIndex);
         }
+
+        timer -= Time.deltaTime;
+
+        if (timer < 0)
+        {
+            SetYear(currentYear + 1);
+        }
+
+        int remainingSeconds = Mathf.CeilToInt(timer);
+
+        if (remainingSeconds != previousSecond)
+        {
+            textTimer.text = $"{remainingSeconds / 60}:{remainingSeconds % 60:00}";
+        }
+
+        previousSecond = remainingSeconds;
     }
 
     private bool CanBuildOnTop(int x, int z, out int yIndex)
@@ -129,6 +163,7 @@ public class GameController : MonoBehaviour
                     } break;
                 case TileType.Forest:
                 case TileType.House:
+                case TileType.Field:
                 case TileType.Stone: return false;
             }
             prevTileType = mapData[x, y, z];
@@ -186,10 +221,55 @@ public class GameController : MonoBehaviour
 
     public void OnClickPlayButton() => SetGameState(GameState.Active);
 
+    public void OnClickMenuButton() => SetGameState(GameState.Menu);
+
+    public void OnClickSkipYearButton() => SetYear(currentYear + 1);
+
+    private void SetYear(int value)
+    {
+        currentYear = value;
+        textYear.text = $"YEAR {currentYear}/{maxYears}";
+        timer = secondsInYear;
+        energy = energyPerLevel;
+        textEnergy.text = energy.ToString();
+
+        if (currentYear % waterRiseYears == 0)
+        {
+            waterLevel += 1;
+        }
+
+        water.transform.position = new Vector3(water.transform.position.x, waterLevel, water.transform.position.z);
+
+        if (value >= maxYears)
+        {
+            SetGameState(GameState.GameOver);
+        }
+    }
+
     private void SetGameState(GameState state)
     {
-        uiContentMenu.SetActive(state == GameState.Menu);
-        uiContentGame.SetActive(state == GameState.Active);
+        gameState = state;
+
+        switch (gameState)
+        {
+            case GameState.Menu:
+                {
+                    ResetGame();
+                } break;
+        }
+
+        uiContentMenu.SetActive(gameState == GameState.Menu);
+        uiContentGameActive.SetActive(gameState == GameState.Active);
+        uiContentGameOver.SetActive(gameState == GameState.GameOver);
+    }
+
+    private void ResetGame()
+    {
+        SetAllMapData(TileType.Empty);
+        SetLayerMapData(TileType.Sand, 0);
+        DrawAllMap();
+        waterLevel = 0;
+        SetYear(1);
     }
 
     private void SetAllMapData(TileType tileType)
@@ -202,6 +282,18 @@ public class GameController : MonoBehaviour
                 {
                     SetMapTile(x, y, z, tileType);
                 }
+            }
+        }
+    }
+
+
+    private void SetLayerMapData(TileType tileType, int y)
+    {
+        for (var x = 0; x < mapSizeX; ++x)
+        {
+            for (var z = 0; z < mapSizeZ; ++z)
+            {
+                SetMapTile(x, y, z, tileType);
             }
         }
     }
