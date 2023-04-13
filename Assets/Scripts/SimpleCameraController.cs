@@ -52,6 +52,7 @@ namespace UnityTemplateProjects
             public void UpdateTransform(Transform t)
             {
                 t.eulerAngles = new Vector3(pitch, yaw, roll);
+
                 t.position = new Vector3(x, y, z);
             }
         }
@@ -75,6 +76,13 @@ namespace UnityTemplateProjects
 
         [Tooltip("Whether or not to invert our Y axis for mouse input to rotation.")]
         public bool invertY = false;
+
+        public float minX;
+        public float maxX;
+        public float minY;
+        public float maxY;
+        public float minZ;
+        public float maxZ;
 
         void OnEnable()
         {
@@ -127,20 +135,20 @@ namespace UnityTemplateProjects
 				#endif
             }
             // Hide and lock cursor when middle mouse button pressed
-            if (Input.GetMouseButtonDown(2))
+            if (Input.GetMouseButtonDown(1))
             {
                 Cursor.lockState = CursorLockMode.Locked;
             }
 
             // Unlock and show cursor when middle mouse button released
-            if (Input.GetMouseButtonUp(2))
+            if (Input.GetMouseButtonUp(1))
             {
                 Cursor.visible = true;
                 Cursor.lockState = CursorLockMode.None;
             }
 
             // Rotation
-            if (Input.GetMouseButton(2))
+            if (Input.GetMouseButton(1))
             {
                 var mouseMovement = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y") * (invertY ? 1 : -1));
                 
@@ -168,6 +176,10 @@ namespace UnityTemplateProjects
 #endif
 
             m_TargetCameraState.Translate(translation);
+
+            m_TargetCameraState.x = Mathf.Clamp(m_TargetCameraState.x, minX, maxX);
+            m_TargetCameraState.y = Mathf.Clamp(m_TargetCameraState.y, minY, maxY);
+            m_TargetCameraState.z = Mathf.Clamp(m_TargetCameraState.z, minZ, maxZ);
 
             // Framerate-independent interpolation
             // Calculate the lerp amount, such that we get 99% of the way to our target in the specified time

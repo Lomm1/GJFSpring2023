@@ -1,5 +1,3 @@
-using UnityEngine;
-
 [System.Serializable]
 public enum GameState
 {
@@ -17,19 +15,12 @@ public enum TileType
     House,
     Stone,
     Field,
-    Sand
+    Invisible
 }
 
 [System.Serializable]
-public enum GroundTileType
+public enum BuildMode
 {
-    TopLeftCorner = 0,
-    TopEdge,
-    TopRightCorner,
-    LeftEdge,
-    Middle,
-    RightEdge,
-    BottomLeftCorner,
-    BottomEdge,
-    BottomRightCorner
+    Add = 0,
+    Remove = 1
 }

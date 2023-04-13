@@ -6,10 +6,10 @@ public class MapObject : MonoBehaviour
     public int yPos;
     public int zPos;
 
-    [SerializeField] private GameObject objectVisual;
-    [SerializeField] private MeshFilter meshFilter;
-    [SerializeField] private MeshRenderer meshRenderer;
-    [SerializeField] private BoxCollider boxCollider;
+    public GameObject objectVisual;
+    public MeshFilter meshFilter;
+    public MeshRenderer meshRenderer;
+    public MeshCollider meshCollider;
 
     public void Initialize(int x, int y, int z)
     {
@@ -21,7 +21,9 @@ public class MapObject : MonoBehaviour
 
     public void SetVisualsActive(bool value)
     {
-        boxCollider.enabled = value;
+        if (meshCollider != null)
+            meshCollider.enabled = value;
+
         objectVisual.SetActive(value);
     }
 
@@ -32,5 +34,13 @@ public class MapObject : MonoBehaviour
         objectVisual.transform.localPosition = visualOffset;
         objectVisual.transform.localScale = scale;
         objectVisual.transform.rotation = rotation;
+
+        if (meshCollider != null)
+            meshCollider.sharedMesh = mesh;
+    }
+
+    public void SetMaterial(Material material)
+    {
+        meshRenderer.material = material;
     }
 }

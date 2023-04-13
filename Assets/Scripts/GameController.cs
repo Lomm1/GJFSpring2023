@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Text;
 
 public class GameController : MonoBehaviour
 {
@@ -23,11 +24,15 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject uiContentMenu;
     [SerializeField] private GameObject uiContentGameActive;
     [SerializeField] private GameObject uiContentGameOver;
+    [SerializeField] private MapObject objectIndicator;
     [SerializeField] private MapObject mapObjectPrefab;
     [SerializeField] private TextMeshProUGUI textTimer;
     [SerializeField] private TextMeshProUGUI textYear;
     [SerializeField] private TextMeshProUGUI textEnergy;
     [SerializeField] private GameObject water;
+    [SerializeField] private Mesh meshCube;
+    [SerializeField] private Material materialBuildModeAdd;
+    [SerializeField] private Material materialBuildModeRemove;
     [SerializeField] private Image imageCurrentTileType;
     [SerializeField] private Color[] colorCurrentTileType;
     [SerializeField] private TileType[] tileTypes;
@@ -41,6 +46,9 @@ public class GameController : MonoBehaviour
     private int previousSecond;
     private int currentTileTypeIndex;
     private Vector2 mouseWorldPosition;
+    private Ray inputRay;
+    private MapObject hitMapObject;
+    private BuildMode buildMode;
 
     private TileType[,,] mapData;
     private MapObject[,,] mapObjects;
@@ -66,7 +74,8 @@ public class GameController : MonoBehaviour
         ResetGame();
 
         SetGameState(gameState);
-        SetCurrentTileIndex((int)TileType.Ground);
+        SetCurrentTileTypeIndex((int)TileType.Ground);
+        SetBuildMode(BuildMode.Add);
     }
 
     private void Update()
@@ -74,39 +83,55 @@ public class GameController : MonoBehaviour
         if (gameState != GameState.Active)
             return;
 
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetKeyDown(KeyCode.P))
+            SaveMap();
+
+        if (Input.GetKeyDown(KeyCode.L))
+            LoadMap();
+
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+            SetBuildMode(BuildMode.Add);
+
+        if (Input.GetKeyDown(KeyCode.Alpha2))
+            SetBuildMode(BuildMode.Remove);
+
+        inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
+        hitMapObject = null;
+
+        if (Physics.Raycast(inputRay, out var hit, Mathf.Infinity))
         {
-            var inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
+            hitMapObject = hit.transform.GetComponentInParent<MapObject>();
+            objectIndicator.gameObject.SetActive(hitMapObject != null);
 
-            if (Physics.Raycast(inputRay, out var hit, Mathf.Infinity))
+            if (hitMapObject != null)
             {
-                var mapObject = hit.transform.GetComponent<MapObject>();
-
-                if (mapObject != null)
+                if (buildMode == BuildMode.Add)
                 {
-                    if (CanBuildOnTop(mapObject.xPos, mapObject.zPos, out var yPos))
+                    if (CanBuildOnTop(hitMapObject.xPos, hitMapObject.zPos, out var y))
                     {
-                        SetMapTile(mapObject.xPos, yPos, mapObject.zPos, tileTypes[currentTileTypeIndex]);
-                        DrawMapTile(mapObject.xPos, yPos, mapObject.zPos);
+                        objectIndicator.SetMaterial(materialBuildModeAdd);
+                        objectIndicator.transform.position = new Vector3(hitMapObject.xPos, y, hitMapObject.zPos);
+                    }
+                    else
+                    {
+                        objectIndicator.SetMaterial(materialBuildModeRemove);
+                        objectIndicator.transform.position = new Vector3(hitMapObject.xPos, hitMapObject.yPos, hitMapObject.zPos);
                     }
                 }
-            }
-        }
-
-        if (Input.GetMouseButtonDown(1))
-        {
-            var inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
-
-            if (Physics.Raycast(inputRay, out var hit, Mathf.Infinity))
-            {
-                var mapObject = hit.transform.GetComponent<MapObject>();
-
-                if (mapObject != null)
+                else if (buildMode == BuildMode.Remove)
                 {
-                    if (CanEraseTile(mapObject.xPos, mapObject.zPos, out var yPos))
+                    objectIndicator.transform.position = new Vector3(hitMapObject.xPos, hitMapObject.yPos, hitMapObject.zPos);
+                }
+
+                if (Input.GetMouseButtonDown(0))
+                {
+                    if (buildMode == BuildMode.Add)
                     {
-                        SetMapTile(mapObject.xPos, yPos, mapObject.zPos, TileType.Empty);
-                        DrawMapTile(mapObject.xPos, yPos, mapObject.zPos);
+                        TryBuild(hitMapObject.xPos, hitMapObject.zPos);
+                    }
+                    else if (buildMode == BuildMode.Remove)
+                    {
+                        TryErase(hitMapObject.xPos, hitMapObject.zPos);
                     }
                 }
             }
@@ -114,12 +139,12 @@ public class GameController : MonoBehaviour
 
         if (Input.mouseScrollDelta.y > 0)
         {
-            SetCurrentTileIndex(++currentTileTypeIndex);
+            SetCurrentTileTypeIndex(++currentTileTypeIndex);
         }
 
         if (Input.mouseScrollDelta.y < 0)
         {
-            SetCurrentTileIndex(--currentTileTypeIndex);
+            SetCurrentTileTypeIndex(--currentTileTypeIndex);
         }
 
         timer -= Time.deltaTime;
@@ -139,11 +164,69 @@ public class GameController : MonoBehaviour
         previousSecond = remainingSeconds;
     }
 
+    private void SaveMap()
+    {
+        var stringBuilder = new StringBuilder();
+        for (var x = 0; x < mapSizeX; ++x)
+        {
+            for (var y = 0; y < mapSizeY; ++y)
+            {
+                for (var z = 0; z < mapSizeZ; ++z)
+                {
+                    stringBuilder.Append((int)mapData[x, y, z]);
+                }
+            }
+        }
+        var textEditor = new TextEditor()
+        {
+            text = stringBuilder.ToString()
+        };
+
+        textEditor.SelectAll();
+        textEditor.Copy();
+
+        Debug.Log("MAP COPIED TO CLIPBOARD");
+    }
+
+    private void LoadMap()
+    {
+        var defaultMapData = new int[mapSizeX * mapSizeY * mapSizeZ];
+        for (var i = 0; i < Constants.DEFAULT_MAP_DATA.Length; ++i)
+        {
+            var mapChar = Constants.DEFAULT_MAP_DATA[i];
+            defaultMapData[i] = mapChar - '0';
+        }
+
+        SetAllMapData(defaultMapData);
+        DrawAllMap();
+    }
+
+    private void SetBuildMode(BuildMode mode)
+    {
+        buildMode = mode;
+
+        switch (buildMode)
+        {
+            case BuildMode.Add:
+                {
+                    objectIndicator.SetVisuals(objectMeshes[currentTileTypeIndex],
+                        materialBuildModeAdd, objectOffsets[currentTileTypeIndex],
+                        objectScales[currentTileTypeIndex], Quaternion.Euler(objectRotations[currentTileTypeIndex]));
+                }
+                break;
+            case BuildMode.Remove:
+                {
+                    objectIndicator.SetVisuals(meshCube, materialBuildModeRemove, Vector3.zero, Vector3.one, Quaternion.identity);
+                }
+                break;
+        }
+    }
+
     private bool CanBuildOnTop(int x, int z, out int yIndex)
     {
-        yIndex = 1;
+        yIndex = 0;
 
-        if (IsValidIndex(x, yIndex, z) == false)
+        if (IsValidMapIndex(x, yIndex, z) == false)
             return false;
 
         var prevTileType = TileType.Empty;
@@ -176,7 +259,7 @@ public class GameController : MonoBehaviour
     {
         yIndex = 1;
 
-        if (IsValidIndex(x, yIndex, z) == false)
+        if (IsValidMapIndex(x, yIndex, z) == false)
             return false;
 
         for (var y = mapSizeY - 1; y > 0; --y)
@@ -191,7 +274,67 @@ public class GameController : MonoBehaviour
         return true;
     }
 
-    private bool IsValidIndex(int x, int y, int z)
+    private bool TryBuild(int x, int z)
+    {
+        if (CanBuildOnTop(x, z, out var y) == false)
+            return false;
+
+        var buildCost = 0;
+        switch (tileTypes[currentTileTypeIndex])
+        {
+            default: buildCost = 0; break;
+            case TileType.Field: buildCost = 2; break;
+            case TileType.House: buildCost = 3; break;
+            case TileType.Forest:
+            case TileType.Ground: buildCost = 1; break;
+        }
+
+        if (energy < buildCost)
+        {
+            return false;
+        }
+
+        SetMapTile(x, y, z, tileTypes[currentTileTypeIndex]);
+        DrawMapTile(x, y, z);
+        SetEnergy(energy - buildCost);
+
+        return true;
+    }
+
+    private bool TryErase(int x, int z)
+    {
+        if (CanEraseTile(x, z, out var y) == false)
+            return false;
+
+        var eraseCost = 0;
+        switch (mapData[x, y, z])
+        {
+            default: eraseCost = 0; break;
+            case TileType.Field:
+            case TileType.Forest: eraseCost = 1; break;
+            case TileType.House:
+            case TileType.Ground: eraseCost = 2; break;
+        }
+
+        if (energy < eraseCost)
+        {
+            return false;
+        }
+
+        SetMapTile(x, y, z, TileType.Empty);
+        DrawMapTile(x, y, z);
+        SetEnergy(energy - eraseCost);
+
+        return true;
+    }
+
+    private void SetEnergy(int value)
+    {
+        energy = value;
+        textEnergy.text = energy.ToString();
+    }
+
+    private bool IsValidMapIndex(int x, int y, int z)
     {
         if (x < 0 || x >= mapSizeX)
             return false;
@@ -205,7 +348,7 @@ public class GameController : MonoBehaviour
         return true;
     }
 
-    private void SetCurrentTileIndex(int index)
+    private void SetCurrentTileTypeIndex(int index)
     {
         currentTileTypeIndex = index;
 
@@ -217,6 +360,13 @@ public class GameController : MonoBehaviour
 
       //  imageCurrentTileType.sprite = tiles[currentTileTypeIndex].sprite;
         imageCurrentTileType.color = colorCurrentTileType[currentTileTypeIndex];
+
+        if (buildMode == BuildMode.Add)
+        {
+            objectIndicator.SetVisuals(objectMeshes[currentTileTypeIndex],
+                objectIndicator.meshRenderer.material, objectOffsets[currentTileTypeIndex],
+                objectScales[currentTileTypeIndex], Quaternion.Euler(objectRotations[currentTileTypeIndex]));
+        }
     }
 
     public void OnClickPlayButton() => SetGameState(GameState.Active);
@@ -230,8 +380,7 @@ public class GameController : MonoBehaviour
         currentYear = value;
         textYear.text = $"YEAR {currentYear}/{maxYears}";
         timer = secondsInYear;
-        energy = energyPerLevel;
-        textEnergy.text = energy.ToString();
+        SetEnergy(energyPerLevel);
 
         if (currentYear % waterRiseYears == 0)
         {
@@ -265,42 +414,59 @@ public class GameController : MonoBehaviour
 
     private void ResetGame()
     {
-        SetAllMapData(TileType.Empty);
-        SetLayerMapData(TileType.Sand, 0);
-        DrawAllMap();
-        waterLevel = 0;
+        //SetAllMapData(TileType.Empty);
+        //SetLayerMapData(TileType.Invisible, 0);
+        //SetLayerMapData(TileType.Ground, 1);
+        //DrawAllMap();
+        LoadMap();
+        waterLevel = 1;
         SetYear(1);
     }
 
-    private void SetAllMapData(TileType tileType)
+    //private void SetAllMapData(TileType tileType)
+    //{
+    //    for (var x = 0; x < mapSizeX; ++x)
+    //    {
+    //        for (var y = 0; y < mapSizeY; ++y)
+    //        {
+    //            for (var z = 0; z < mapSizeZ; ++z)
+    //            {
+    //                SetMapTile(x, y, z, tileType);
+    //            }
+    //        }
+    //    }
+    //}
+
+    //private void SetLayerMapData(TileType tileType, int y)
+    //{
+    //    for (var x = 0; x < mapSizeX; ++x)
+    //    {
+    //        for (var z = 0; z < mapSizeZ; ++z)
+    //        {
+    //            SetMapTile(x, y, z, tileType);
+    //        }
+    //    }
+    //}
+
+    private void SetAllMapData(int[] newData)
     {
+        int index = 0;
         for (var x = 0; x < mapSizeX; ++x)
         {
             for (var y = 0; y < mapSizeY; ++y)
             {
                 for (var z = 0; z < mapSizeZ; ++z)
                 {
-                    SetMapTile(x, y, z, tileType);
+                    SetMapTile(x, y, z, (TileType)newData[index]);
+                    ++index;
                 }
-            }
-        }
-    }
-
-
-    private void SetLayerMapData(TileType tileType, int y)
-    {
-        for (var x = 0; x < mapSizeX; ++x)
-        {
-            for (var z = 0; z < mapSizeZ; ++z)
-            {
-                SetMapTile(x, y, z, tileType);
             }
         }
     }
 
     private void SetMapTile(int x, int y, int z, TileType tileType)
     {
-        if (IsValidIndex(x,y,z) == false)
+        if (IsValidMapIndex(x,y,z) == false)
             return;
 
         mapData[x,y,z] = tileType;
