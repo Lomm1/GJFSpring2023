@@ -19,6 +19,10 @@ public class GameController : MonoBehaviour
     public int waterLevel;
     public int energy;
     public int energyPerLevel;
+    public int houses;
+    public int houseGoal;
+    public int farms;
+    public int farmGoal;
 
     [SerializeField] private Transform transformMapObjectsParent;
     [SerializeField] private GameObject uiContentMenu;
@@ -29,6 +33,8 @@ public class GameController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textTimer;
     [SerializeField] private TextMeshProUGUI textYear;
     [SerializeField] private TextMeshProUGUI textEnergy;
+    [SerializeField] private TextMeshProUGUI textHouses;
+    [SerializeField] private TextMeshProUGUI textFarms;
     [SerializeField] private GameObject water;
     [SerializeField] private Mesh meshCube;
     [SerializeField] private Material materialBuildModeAdd;
@@ -80,6 +86,12 @@ public class GameController : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Application.Quit();
+            return;
+        }
+
         if (gameState != GameState.Active)
             return;
 
@@ -107,16 +119,15 @@ public class GameController : MonoBehaviour
             {
                 if (buildMode == BuildMode.Add)
                 {
-                    if (CanBuildOnTop(hitMapObject.xPos, hitMapObject.zPos, out var y))
+                    if (CanBuildOnTop(hitMapObject.xPos, hitMapObject.zPos, tileTypes[currentTileTypeIndex], out var y))
                     {
                         objectIndicator.SetMaterial(materialBuildModeAdd);
-                        objectIndicator.transform.position = new Vector3(hitMapObject.xPos, y, hitMapObject.zPos);
                     }
                     else
                     {
                         objectIndicator.SetMaterial(materialBuildModeRemove);
-                        objectIndicator.transform.position = new Vector3(hitMapObject.xPos, hitMapObject.yPos, hitMapObject.zPos);
                     }
+                    objectIndicator.transform.position = new Vector3(hitMapObject.xPos, y, hitMapObject.zPos);
                 }
                 else if (buildMode == BuildMode.Remove)
                 {
@@ -159,6 +170,7 @@ public class GameController : MonoBehaviour
         if (remainingSeconds != previousSecond)
         {
             textTimer.text = $"{remainingSeconds / 60}:{remainingSeconds % 60:00}";
+            textTimer.color = remainingSeconds <= 5 ? Color.red : Color.white;
         }
 
         previousSecond = remainingSeconds;
@@ -222,7 +234,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    private bool CanBuildOnTop(int x, int z, out int yIndex)
+    private bool CanBuildOnTop(int x, int z, TileType selectedTile, out int yIndex)
     {
         yIndex = 0;
 
@@ -235,10 +247,17 @@ public class GameController : MonoBehaviour
         {
             switch(mapData[x,y,z])
             {
-                default: continue;
+                default: prevTileType = mapData[x, y, z]; continue;
                 case TileType.Empty:
                     {
-                        if (prevTileType == TileType.Ground || prevTileType == TileType.Empty)
+                        if (selectedTile != TileType.Ground && waterLevel >= y || y < waterLevel)
+                        {
+                            yIndex = y;
+                            return false;
+                        }
+
+                        if ((prevTileType == TileType.Ground || prevTileType == TileType.Empty) ||
+                            (prevTileType == TileType.Invisible && selectedTile == TileType.Ground))
                         {
                             yIndex = y;
                             return true;
@@ -246,10 +265,13 @@ public class GameController : MonoBehaviour
                     } break;
                 case TileType.Forest:
                 case TileType.House:
-                case TileType.Field:
-                case TileType.Stone: return false;
+                case TileType.Farm:
+                case TileType.Stone:
+                    {
+                        yIndex = y;
+                        return false;
+                    }
             }
-            prevTileType = mapData[x, y, z];
         }
 
         return false;
@@ -267,7 +289,17 @@ public class GameController : MonoBehaviour
             switch (mapData[x, y, z])
             {
                 case TileType.Empty: continue;
-                default: yIndex = y; return true;
+                default:
+                    {
+                        if (mapData[x, y, z] != TileType.Ground && waterLevel >= y || y < waterLevel)
+                        {
+                            yIndex = y;
+                            return false;
+                        }
+
+                        yIndex = y;
+                        return true;
+                    }
             }
         }
 
@@ -276,14 +308,14 @@ public class GameController : MonoBehaviour
 
     private bool TryBuild(int x, int z)
     {
-        if (CanBuildOnTop(x, z, out var y) == false)
+        if (CanBuildOnTop(x, z, tileTypes[currentTileTypeIndex], out var y) == false)
             return false;
 
         var buildCost = 0;
         switch (tileTypes[currentTileTypeIndex])
         {
             default: buildCost = 0; break;
-            case TileType.Field: buildCost = 2; break;
+            case TileType.Farm: buildCost = 2; break;
             case TileType.House: buildCost = 3; break;
             case TileType.Forest:
             case TileType.Ground: buildCost = 1; break;
@@ -310,7 +342,7 @@ public class GameController : MonoBehaviour
         switch (mapData[x, y, z])
         {
             default: eraseCost = 0; break;
-            case TileType.Field:
+            case TileType.Farm:
             case TileType.Forest: eraseCost = 1; break;
             case TileType.House:
             case TileType.Ground: eraseCost = 2; break;
@@ -389,6 +421,8 @@ public class GameController : MonoBehaviour
 
         water.transform.position = new Vector3(water.transform.position.x, waterLevel, water.transform.position.z);
 
+        CountScores();
+
         if (value >= maxYears)
         {
             SetGameState(GameState.GameOver);
@@ -421,6 +455,7 @@ public class GameController : MonoBehaviour
         LoadMap();
         waterLevel = 1;
         SetYear(1);
+        CountScores();
     }
 
     //private void SetAllMapData(TileType tileType)
@@ -489,16 +524,53 @@ public class GameController : MonoBehaviour
     private void DrawMapTile(int x, int y, int z)
     {
         var tileVector = new Vector3Int(x, y, z);
+
         if (mapData[x, y, z] == TileType.Empty)
         {
-            mapObjects[x, y, z].SetVisualsActive(false);
+            mapObjects[x, y, z].SetVisualsActive(false, false);
         }
         else
         {
             int rand = Random.Range(0, 4);
             var objectType = (int)mapData[x, y, z];
-            mapObjects[x, y, z].SetVisualsActive(true);
+
             mapObjects[x, y, z].SetVisuals(objectMeshes[objectType], objectMaterials[objectType], objectOffsets[objectType], objectScales[objectType], Quaternion.Euler(objectRotations[objectType]));
+
+            if (mapData[x, y, z] == TileType.Invisible)
+            {
+                mapObjects[x, y, z].SetVisualsActive(false, true);
+            }
+            else
+            {
+                mapObjects[x, y, z].SetVisualsActive(true);
+            }
         }
+    }
+
+    private void CountScores()
+    {
+        houses = 0;
+        farms = 0;
+
+        for (var x = 0; x < mapSizeX; ++x)
+        {
+            for (var y = 0; y < mapSizeY; ++y)
+            {
+                for (var z = 0; z < mapSizeZ; ++z)
+                {
+                    if (y > waterLevel)
+                    {
+                        switch (mapData[x, y, z])
+                        {
+                            case TileType.House: ++houses; break;
+                            case TileType.Farm: ++farms; break;
+                        }
+                    }
+                }
+            }
+        }
+
+        textHouses.text = $"{houses}/{houseGoal}";
+        textFarms.text = $"{farms}/{farmGoal}";
     }
 }

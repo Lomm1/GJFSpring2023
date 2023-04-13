@@ -19,12 +19,12 @@ public class MapObject : MonoBehaviour
         gameObject.transform.position = new Vector3(x, y, z);
     }
 
-    public void SetVisualsActive(bool value)
+    public void SetVisualsActive(bool value, bool meshActive = true)
     {
         if (meshCollider != null)
-            meshCollider.enabled = value;
+            meshCollider.enabled = meshActive;
 
-        objectVisual.SetActive(value);
+        meshRenderer.enabled = value;
     }
 
     public void SetVisuals(Mesh mesh, Material material, Vector3 visualOffset, Vector3 scale, Quaternion rotation)
