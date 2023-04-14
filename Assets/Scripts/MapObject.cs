@@ -2,6 +2,10 @@ using UnityEngine;
 
 public class MapObject : MonoBehaviour
 {
+    public MapObjectState State { get; private set; }
+
+    public int yearsRemaining;
+
     public int xPos;
     public int yPos;
     public int zPos;
@@ -17,6 +21,12 @@ public class MapObject : MonoBehaviour
         yPos = y;
         zPos = z;
         gameObject.transform.position = new Vector3(x, y, z);
+    }
+
+    public void SetState(MapObjectState state, int buildTime)
+    {
+        State = state;
+        yearsRemaining = buildTime;
     }
 
     public void SetVisualsActive(bool value, bool meshActive = true)

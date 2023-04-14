@@ -24,10 +24,12 @@ public class GameController : MonoBehaviour
     public int farms;
     public int farmGoal;
 
+    [SerializeField] private SimpleCameraController cameraController;
     [SerializeField] private Transform transformMapObjectsParent;
     [SerializeField] private GameObject uiContentMenu;
     [SerializeField] private GameObject uiContentGameActive;
     [SerializeField] private GameObject uiContentGameOver;
+    [SerializeField] private GameObject uiInfoPanel;
     [SerializeField] private MapObject objectIndicator;
     [SerializeField] private MapObject mapObjectPrefab;
     [SerializeField] private TextMeshProUGUI textTimer;
@@ -40,13 +42,6 @@ public class GameController : MonoBehaviour
     [SerializeField] private Material materialBuildModeAdd;
     [SerializeField] private Material materialBuildModeRemove;
     [SerializeField] private Image imageCurrentTileType;
-    [SerializeField] private Color[] colorCurrentTileType;
-    [SerializeField] private TileType[] tileTypes;
-    [SerializeField] private Mesh[] objectMeshes;
-    [SerializeField] private Material[] objectMaterials;
-    [SerializeField] private Vector3[] objectOffsets;
-    [SerializeField] private Vector3[] objectScales;
-    [SerializeField] private Vector3[] objectRotations;
 
     private float timer;
     private int previousSecond;
@@ -61,6 +56,8 @@ public class GameController : MonoBehaviour
 
     private void Awake()
     {
+        MapObjectSettings.Initialize();
+
         // Initilize map
         mapData = new TileType[mapSizeX, mapSizeY, mapSizeZ];
         mapObjects = new MapObject[mapSizeX, mapSizeY, mapSizeZ];
@@ -94,13 +91,13 @@ public class GameController : MonoBehaviour
 
         if (gameState != GameState.Active)
             return;
-
+#if UNITY_EDITOR
         if (Input.GetKeyDown(KeyCode.P))
             SaveMap();
 
         if (Input.GetKeyDown(KeyCode.L))
             LoadMap();
-
+#endif
         if (Input.GetKeyDown(KeyCode.Alpha1))
             SetBuildMode(BuildMode.Add);
 
@@ -119,7 +116,7 @@ public class GameController : MonoBehaviour
             {
                 if (buildMode == BuildMode.Add)
                 {
-                    if (CanBuildOnTop(hitMapObject.xPos, hitMapObject.zPos, tileTypes[currentTileTypeIndex], out var y))
+                    if (CanBuildOnTop(hitMapObject.xPos, hitMapObject.zPos, (TileType)currentTileTypeIndex, out var y))
                     {
                         objectIndicator.SetMaterial(materialBuildModeAdd);
                     }
@@ -142,7 +139,7 @@ public class GameController : MonoBehaviour
                     }
                     else if (buildMode == BuildMode.Remove)
                     {
-                        TryErase(hitMapObject.xPos, hitMapObject.zPos);
+                        TryDemolish(hitMapObject.xPos, hitMapObject.zPos);
                     }
                 }
             }
@@ -217,13 +214,13 @@ public class GameController : MonoBehaviour
     {
         buildMode = mode;
 
+        var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
+
         switch (buildMode)
         {
             case BuildMode.Add:
                 {
-                    objectIndicator.SetVisuals(objectMeshes[currentTileTypeIndex],
-                        materialBuildModeAdd, objectOffsets[currentTileTypeIndex],
-                        objectScales[currentTileTypeIndex], Quaternion.Euler(objectRotations[currentTileTypeIndex]));
+                    objectIndicator.SetVisuals(objectDef.mesh, materialBuildModeAdd, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
                 }
                 break;
             case BuildMode.Remove:
@@ -259,6 +256,12 @@ public class GameController : MonoBehaviour
                         if ((prevTileType == TileType.Ground || prevTileType == TileType.Empty) ||
                             (prevTileType == TileType.Invisible && selectedTile == TileType.Ground))
                         {
+                            if (y > 0 && mapObjects[x, y - 1, z].State != MapObjectState.Complete)
+                            {
+                                yIndex = y - 1;
+                                return false;
+                            }
+
                             yIndex = y;
                             return true;
                         }
@@ -297,6 +300,12 @@ public class GameController : MonoBehaviour
                             return false;
                         }
 
+                        if (y > 0 && mapObjects[x, y, z].State != MapObjectState.Complete)
+                        {
+                            yIndex = y - 1;
+                            return false;
+                        }
+
                         yIndex = y;
                         return true;
                     }
@@ -308,54 +317,53 @@ public class GameController : MonoBehaviour
 
     private bool TryBuild(int x, int z)
     {
-        if (CanBuildOnTop(x, z, tileTypes[currentTileTypeIndex], out var y) == false)
+        var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
+        if (CanBuildOnTop(x, z, objectDef.tileType, out var y) == false)
             return false;
 
-        var buildCost = 0;
-        switch (tileTypes[currentTileTypeIndex])
-        {
-            default: buildCost = 0; break;
-            case TileType.Farm: buildCost = 2; break;
-            case TileType.House: buildCost = 3; break;
-            case TileType.Forest:
-            case TileType.Ground: buildCost = 1; break;
-        }
-
-        if (energy < buildCost)
+        if (energy < objectDef.buildCost)
         {
             return false;
         }
 
-        SetMapTile(x, y, z, tileTypes[currentTileTypeIndex]);
+        if (objectDef.buildTime == 0)
+        {
+            SetMapTile(x, y, z, objectDef.tileType, MapObjectState.Complete, 0);
+        }
+        else
+        {
+            SetMapTile(x, y, z, objectDef.tileType, MapObjectState.Building, objectDef.buildTime);
+        }
+
         DrawMapTile(x, y, z);
-        SetEnergy(energy - buildCost);
+        SetEnergy(energy - objectDef.buildCost);
 
         return true;
     }
 
-    private bool TryErase(int x, int z)
+    private bool TryDemolish(int x, int z)
     {
         if (CanEraseTile(x, z, out var y) == false)
             return false;
 
-        var eraseCost = 0;
-        switch (mapData[x, y, z])
-        {
-            default: eraseCost = 0; break;
-            case TileType.Farm:
-            case TileType.Forest: eraseCost = 1; break;
-            case TileType.House:
-            case TileType.Ground: eraseCost = 2; break;
-        }
+        var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
 
-        if (energy < eraseCost)
+        if (energy < objectDef.removeCost)
         {
             return false;
         }
 
-        SetMapTile(x, y, z, TileType.Empty);
+        if (objectDef.removeTime == 0)
+        {
+            SetMapTile(x, y, z, TileType.Empty, MapObjectState.Complete, 0);
+        }
+        else
+        {
+            SetMapTile(x, y, z, mapData[x, y, z], MapObjectState.Demolishing, objectDef.removeTime);
+        }
+
         DrawMapTile(x, y, z);
-        SetEnergy(energy - eraseCost);
+        SetEnergy(energy - objectDef.removeCost);
 
         return true;
     }
@@ -382,28 +390,32 @@ public class GameController : MonoBehaviour
 
     private void SetCurrentTileTypeIndex(int index)
     {
+        var definitionsLength = MapObjectSettings.Instance.mapObjectDefinitions.Length;
+
         currentTileTypeIndex = index;
 
-        if (currentTileTypeIndex >= tileTypes.Length)
+        if (currentTileTypeIndex >= definitionsLength)
             currentTileTypeIndex = 1; // 0 is empty, don't want to go there
 
         if (currentTileTypeIndex < 1)
-            currentTileTypeIndex = tileTypes.Length - 1;
+            currentTileTypeIndex = definitionsLength - 1;
+
+        var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
 
       //  imageCurrentTileType.sprite = tiles[currentTileTypeIndex].sprite;
-        imageCurrentTileType.color = colorCurrentTileType[currentTileTypeIndex];
+        imageCurrentTileType.color = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex].iconColor;
 
         if (buildMode == BuildMode.Add)
         {
-            objectIndicator.SetVisuals(objectMeshes[currentTileTypeIndex],
-                objectIndicator.meshRenderer.material, objectOffsets[currentTileTypeIndex],
-                objectScales[currentTileTypeIndex], Quaternion.Euler(objectRotations[currentTileTypeIndex]));
+            objectIndicator.SetVisuals(objectDef.mesh, objectIndicator.meshRenderer.material, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
         }
     }
 
     public void OnClickPlayButton() => SetGameState(GameState.Active);
 
     public void OnClickMenuButton() => SetGameState(GameState.Menu);
+
+    public void OnClickInfoButton() => uiInfoPanel.SetActive(!uiInfoPanel.activeSelf);
 
     public void OnClickSkipYearButton() => SetYear(currentYear + 1);
 
@@ -421,11 +433,50 @@ public class GameController : MonoBehaviour
 
         water.transform.position = new Vector3(water.transform.position.x, waterLevel, water.transform.position.z);
 
+        cameraController.minY = waterLevel + 1f;
+
         CountScores();
 
         if (value >= maxYears)
         {
             SetGameState(GameState.GameOver);
+            return;
+        }
+
+        for (var x = 0; x < mapSizeX; ++x)
+        {
+            for (var y = 0; y < mapSizeY; ++y)
+            {
+                for (var z = 0; z < mapSizeZ; ++z)
+                {
+                    switch (mapData[x, y, z])
+                    {
+                        case TileType.Empty: continue;
+                        default:
+                            {
+                                if (mapObjects[x, y, z].State == MapObjectState.Complete)
+                                {
+                                    continue;
+                                }
+
+                                mapObjects[x, y, z].yearsRemaining--;
+
+                                if (mapObjects[x, y, z].yearsRemaining <= 0)
+                                {
+                                    if (mapObjects[x, y, z].State == MapObjectState.Building)
+                                    {
+                                        mapObjects[x, y, z].SetState(MapObjectState.Complete, 0);
+                                    }
+                                    else if (mapObjects[x, y, z].State == MapObjectState.Demolishing)
+                                    {
+                                        SetMapTile(x, y, z, TileType.Empty, MapObjectState.Complete, 0);
+                                    }
+                                    DrawMapTile(x, y, z);
+                                }
+                            } break;
+                    }
+                }
+            }
         }
     }
 
@@ -438,6 +489,10 @@ public class GameController : MonoBehaviour
             case GameState.Menu:
                 {
                     ResetGame();
+                } break;
+            case GameState.Active:
+                {
+                    uiInfoPanel.SetActive(false);
                 } break;
         }
 
@@ -492,19 +547,20 @@ public class GameController : MonoBehaviour
             {
                 for (var z = 0; z < mapSizeZ; ++z)
                 {
-                    SetMapTile(x, y, z, (TileType)newData[index]);
+                    SetMapTile(x, y, z, (TileType)newData[index], MapObjectState.Complete, 0);
                     ++index;
                 }
             }
         }
     }
 
-    private void SetMapTile(int x, int y, int z, TileType tileType)
+    private void SetMapTile(int x, int y, int z, TileType tileType, MapObjectState state, int yearDelay)
     {
         if (IsValidMapIndex(x,y,z) == false)
             return;
 
         mapData[x,y,z] = tileType;
+        mapObjects[x, y, z].SetState(state, yearDelay);
     }
 
     private void DrawAllMap()
@@ -533,8 +589,7 @@ public class GameController : MonoBehaviour
         {
             int rand = Random.Range(0, 4);
             var objectType = (int)mapData[x, y, z];
-
-            mapObjects[x, y, z].SetVisuals(objectMeshes[objectType], objectMaterials[objectType], objectOffsets[objectType], objectScales[objectType], Quaternion.Euler(objectRotations[objectType]));
+            var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[objectType];
 
             if (mapData[x, y, z] == TileType.Invisible)
             {
@@ -543,6 +598,25 @@ public class GameController : MonoBehaviour
             else
             {
                 mapObjects[x, y, z].SetVisualsActive(true);
+            }
+
+            switch (mapObjects[x, y, z].State)
+            {
+                case MapObjectState.Complete:
+                    {
+                        mapObjects[x, y, z].SetVisuals(objectDef.mesh, objectDef.material, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
+                    }
+                    break;
+                case MapObjectState.Building:
+                    {
+                        mapObjects[x, y, z].SetVisuals(objectDef.mesh, materialBuildModeAdd, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
+                    }
+                    break;
+                case MapObjectState.Demolishing:
+                    {
+                        mapObjects[x, y, z].SetVisuals(objectDef.mesh, materialBuildModeRemove, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
+                    }
+                    break;
             }
         }
     }

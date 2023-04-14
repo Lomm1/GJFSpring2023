@@ -24,3 +24,11 @@ public enum BuildMode
     Add = 0,
     Remove = 1
 }
+
+[System.Serializable]
+public enum MapObjectState
+{
+    Complete = 0,
+    Building,
+    Demolishing
+}
