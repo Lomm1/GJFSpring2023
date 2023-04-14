@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Text;
@@ -19,6 +19,7 @@ public class GameController : MonoBehaviour
     public int waterLevel;
     public int energy;
     public int energyPerLevel;
+    public int wood;
     public int houses;
     public int houseGoal;
     public int farms;
@@ -35,14 +36,17 @@ public class GameController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textTimer;
     [SerializeField] private TextMeshProUGUI textYear;
     [SerializeField] private TextMeshProUGUI textEnergy;
+    [SerializeField] private TextMeshProUGUI textWood;
     [SerializeField] private TextMeshProUGUI textHouses;
     [SerializeField] private TextMeshProUGUI textFarms;
+    [SerializeField] private Slider sliderTimeInYear;
     [SerializeField] private GameObject water;
     [SerializeField] private Mesh meshCube;
     [SerializeField] private Material materialBuildModeAdd;
     [SerializeField] private Material materialBuildModeRemove;
     [SerializeField] private Image imageCurrentTileType;
 
+    private bool infiniteTime;
     private float timer;
     private int previousSecond;
     private int currentTileTypeIndex;
@@ -93,7 +97,7 @@ public class GameController : MonoBehaviour
             return;
 #if UNITY_EDITOR
         if (Input.GetKeyDown(KeyCode.P))
-            SaveMap();
+            SaveMapToClipboard();
 
         if (Input.GetKeyDown(KeyCode.L))
             LoadMap();
@@ -155,7 +159,8 @@ public class GameController : MonoBehaviour
             SetCurrentTileTypeIndex(--currentTileTypeIndex);
         }
 
-        timer -= Time.deltaTime;
+        if (infiniteTime == false)
+            timer -= Time.deltaTime;
 
         if (timer < 0)
         {
@@ -173,7 +178,22 @@ public class GameController : MonoBehaviour
         previousSecond = remainingSeconds;
     }
 
-    private void SaveMap()
+    public void OnClickPlayButton() => SetGameState(GameState.Active);
+
+    public void OnClickMenuButton() => SetGameState(GameState.Menu);
+
+    public void OnClickInfoButton() => uiInfoPanel.SetActive(!uiInfoPanel.activeSelf);
+
+    public void OnClickSkipYearButton() => SetYear(currentYear + 1);
+
+    public void OnTimeSliderChanged()
+    {
+        secondsInYear = Mathf.CeilToInt(30 * sliderTimeInYear.value);
+        textTimer.gameObject.SetActive(secondsInYear > 0);
+        textTimer.text = $"{secondsInYear / 60}:{secondsInYear % 60:00}";
+    }
+
+    private void SaveMapToClipboard()
     {
         var stringBuilder = new StringBuilder();
         for (var x = 0; x < mapSizeX; ++x)
@@ -321,7 +341,7 @@ public class GameController : MonoBehaviour
         if (CanBuildOnTop(x, z, objectDef.tileType, out var y) == false)
             return false;
 
-        if (energy < objectDef.buildCost)
+        if (energy < objectDef.buildCostEnergy || wood < objectDef.buildCostWood)
         {
             return false;
         }
@@ -336,7 +356,8 @@ public class GameController : MonoBehaviour
         }
 
         DrawMapTile(x, y, z);
-        SetEnergy(energy - objectDef.buildCost);
+        SetEnergy(energy - objectDef.buildCostEnergy);
+        SetWood(wood - objectDef.buildCostWood);
 
         return true;
     }
@@ -411,19 +432,14 @@ public class GameController : MonoBehaviour
         }
     }
 
-    public void OnClickPlayButton() => SetGameState(GameState.Active);
-
-    public void OnClickMenuButton() => SetGameState(GameState.Menu);
-
-    public void OnClickInfoButton() => uiInfoPanel.SetActive(!uiInfoPanel.activeSelf);
-
-    public void OnClickSkipYearButton() => SetYear(currentYear + 1);
-
     private void SetYear(int value)
     {
         currentYear = value;
         textYear.text = $"YEAR {currentYear}/{maxYears}";
         timer = secondsInYear;
+        infiniteTime = secondsInYear == 0;
+        OnTimeSliderChanged();
+
         SetEnergy(energyPerLevel);
 
         if (currentYear % waterRiseYears == 0)
@@ -465,10 +481,12 @@ public class GameController : MonoBehaviour
                                 {
                                     if (mapObjects[x, y, z].State == MapObjectState.Building)
                                     {
+                                        SetWood(wood + MapObjectSettings.Instance.mapObjectDefinitions[(int)mapData[x, y, z]].woodFromBuilding);
                                         mapObjects[x, y, z].SetState(MapObjectState.Complete, 0);
                                     }
                                     else if (mapObjects[x, y, z].State == MapObjectState.Demolishing)
                                     {
+                                        SetWood(wood + MapObjectSettings.Instance.mapObjectDefinitions[(int)mapData[x, y, z]].woodFromDestruction);
                                         SetMapTile(x, y, z, TileType.Empty, MapObjectState.Complete, 0);
                                     }
                                     DrawMapTile(x, y, z);
@@ -480,6 +498,12 @@ public class GameController : MonoBehaviour
         }
     }
 
+    private void SetWood(int value)
+    {
+        wood = value;
+        textWood.text = $"{wood}";
+    }
+
     private void SetGameState(GameState state)
     {
         gameState = state;
@@ -488,10 +512,11 @@ public class GameController : MonoBehaviour
         {
             case GameState.Menu:
                 {
-                    ResetGame();
+                 //   ResetGame();
                 } break;
             case GameState.Active:
                 {
+                    ResetGame();
                     uiInfoPanel.SetActive(false);
                 } break;
         }
@@ -509,6 +534,7 @@ public class GameController : MonoBehaviour
         //DrawAllMap();
         LoadMap();
         waterLevel = 1;
+        SetWood(0);
         SetYear(1);
         CountScores();
     }

@@ -20,8 +20,11 @@ public struct MapObjectDefinition
     public Vector3 scale;
     public Vector3 rotation;
     public int gridSize;
-    public int buildCost;
+    public int buildCostEnergy;
+    public int buildCostWood;
     public int removeCost;
     public int buildTime;
     public int removeTime;
+    public int woodFromDestruction;
+    public int woodFromBuilding;
 }
