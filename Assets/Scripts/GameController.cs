@@ -44,12 +44,13 @@ public class GameController : MonoBehaviour
     [SerializeField] private Mesh meshCube;
     [SerializeField] private Material materialBuildModeAdd;
     [SerializeField] private Material materialBuildModeRemove;
-    [SerializeField] private Image imageCurrentTileType;
+    [SerializeField] private GameObject[] hotkeyButtons;
 
     private bool infiniteTime;
     private float timer;
     private int previousSecond;
     private int currentTileTypeIndex;
+    private int hotkeyIndex;
     private Vector2 mouseWorldPosition;
     private Ray inputRay;
     private MapObject hitMapObject;
@@ -81,7 +82,6 @@ public class GameController : MonoBehaviour
         ResetGame();
 
         SetGameState(gameState);
-        SetCurrentTileTypeIndex((int)TileType.Ground);
         SetBuildMode(BuildMode.Add);
     }
 
@@ -103,15 +103,24 @@ public class GameController : MonoBehaviour
             LoadMap();
 #endif
         if (Input.GetKeyDown(KeyCode.Alpha1))
-            SetBuildMode(BuildMode.Add);
+            SetCurrentTileTypeIndex(0);
 
         if (Input.GetKeyDown(KeyCode.Alpha2))
-            SetBuildMode(BuildMode.Remove);
+            SetCurrentTileTypeIndex(1);
+
+        if (Input.GetKeyDown(KeyCode.Alpha3))
+            SetCurrentTileTypeIndex(2);
+
+        if (Input.GetKeyDown(KeyCode.Alpha4))
+            SetCurrentTileTypeIndex(3);
+
+        if (Input.GetKeyDown(KeyCode.Alpha5))
+            SetCurrentTileTypeIndex(4);
 
         inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
         hitMapObject = null;
 
-        if (Physics.Raycast(inputRay, out var hit, Mathf.Infinity))
+        if (Input.mousePosition.y > 128 && Input.mousePosition.y < Screen.height - 96 && Physics.Raycast(inputRay, out var hit, Mathf.Infinity))
         {
             hitMapObject = hit.transform.GetComponentInParent<MapObject>();
             objectIndicator.gameObject.SetActive(hitMapObject != null);
@@ -151,12 +160,12 @@ public class GameController : MonoBehaviour
 
         if (Input.mouseScrollDelta.y > 0)
         {
-            SetCurrentTileTypeIndex(++currentTileTypeIndex);
+            SetCurrentTileTypeIndex(++hotkeyIndex);
         }
 
         if (Input.mouseScrollDelta.y < 0)
         {
-            SetCurrentTileTypeIndex(--currentTileTypeIndex);
+            SetCurrentTileTypeIndex(--hotkeyIndex);
         }
 
         if (infiniteTime == false)
@@ -185,6 +194,47 @@ public class GameController : MonoBehaviour
     public void OnClickInfoButton() => uiInfoPanel.SetActive(!uiInfoPanel.activeSelf);
 
     public void OnClickSkipYearButton() => SetYear(currentYear + 1);
+
+    public void SetCurrentTileTypeIndex(int index)
+    {
+        hotkeyIndex = index;
+
+        if (hotkeyIndex > 4)
+            hotkeyIndex = 0;
+
+        if (hotkeyIndex < 0)
+            hotkeyIndex = 4;
+
+        switch (hotkeyIndex)
+        {
+            case 0: currentTileTypeIndex = 1; break;
+            case 1: currentTileTypeIndex = 3; break;
+            case 2: currentTileTypeIndex = 5; break;
+            case 3: currentTileTypeIndex = 2; break;
+                //case 4: currentTileTypeIndex = 1; break;
+        }
+
+        var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
+
+        if (hotkeyIndex == 4)
+        {
+            SetBuildMode(BuildMode.Remove);
+        }
+        else
+        {
+            SetBuildMode(BuildMode.Add);
+        }
+
+        for (var i = 0; i < hotkeyButtons.Length; ++i)
+            hotkeyButtons[i].transform.localPosition = new Vector3(hotkeyButtons[i].transform.localPosition.x, 0, hotkeyButtons[i].transform.localPosition.z);
+
+        hotkeyButtons[hotkeyIndex].transform.localPosition = new Vector3(hotkeyButtons[hotkeyIndex].transform.localPosition.x, 24, hotkeyButtons[hotkeyIndex].transform.localPosition.z);
+
+        if (buildMode == BuildMode.Add)
+        {
+            objectIndicator.SetVisuals(objectDef.mesh, objectIndicator.meshRenderer.material, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
+        }
+    }
 
     public void OnTimeSliderChanged()
     {
@@ -409,29 +459,6 @@ public class GameController : MonoBehaviour
         return true;
     }
 
-    private void SetCurrentTileTypeIndex(int index)
-    {
-        var definitionsLength = MapObjectSettings.Instance.mapObjectDefinitions.Length;
-
-        currentTileTypeIndex = index;
-
-        if (currentTileTypeIndex >= definitionsLength)
-            currentTileTypeIndex = 1; // 0 is empty, don't want to go there
-
-        if (currentTileTypeIndex < 1)
-            currentTileTypeIndex = definitionsLength - 1;
-
-        var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
-
-      //  imageCurrentTileType.sprite = tiles[currentTileTypeIndex].sprite;
-        imageCurrentTileType.color = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex].iconColor;
-
-        if (buildMode == BuildMode.Add)
-        {
-            objectIndicator.SetVisuals(objectDef.mesh, objectIndicator.meshRenderer.material, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
-        }
-    }
-
     private void SetYear(int value)
     {
         currentYear = value;
@@ -516,6 +543,7 @@ public class GameController : MonoBehaviour
                 } break;
             case GameState.Active:
                 {
+                    SetCurrentTileTypeIndex(0);
                     ResetGame();
                     uiInfoPanel.SetActive(false);
                 } break;
