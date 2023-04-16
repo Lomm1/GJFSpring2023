@@ -18,6 +18,7 @@ public class GameController : MonoBehaviour
     public int energyPerLevel;
     public int houseGoal;
     public int farmGoal;
+    public float waterRiseSpeed;
 
     [SerializeField] private SimpleCameraController cameraController;
     [SerializeField] private Transform cameraStartTransform;
@@ -28,6 +29,14 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject uiInfoPanel;
     [SerializeField] private MapObject objectIndicator;
     [SerializeField] private MapObject mapObjectPrefab;
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioSource audioSourceQuiet;
+    [SerializeField] private AudioClip clipAddObject;
+    [SerializeField] private AudioClip clipRemoveObject;
+    [SerializeField] private AudioClip clipWaterRise;
+    [SerializeField] private AudioClip clipNextYear;
+    [SerializeField] private AudioClip clipClick;
+    [SerializeField] private AudioClip clipGameOver;
     [SerializeField] private TextMeshProUGUI textTimer;
     [SerializeField] private TextMeshProUGUI textYear;
     [SerializeField] private TextMeshProUGUI textEnergy;
@@ -47,6 +56,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private Material materialBuildModeAdd;
     [SerializeField] private Material materialBuildModeRemove;
     [SerializeField] private ParticleSystem particleSystemBuildingComplete;
+    [SerializeField] private ParticleSystem particleSystemBuildingRemoved;
     [SerializeField] private GameObject hotkeyButtonsPanel;
     [SerializeField] private GameObject[] hotkeyButtons;
 
@@ -65,6 +75,7 @@ public class GameController : MonoBehaviour
     private Ray inputRay;
     private MapObject hitMapObject;
     private BuildMode buildMode;
+    private float waterYTarget;
 
     private TileType[,,] mapData;
     private MapObject[,,] mapObjects;
@@ -117,6 +128,15 @@ public class GameController : MonoBehaviour
         if (textWaterRises.alpha > 0)
             textWaterRises.alpha -= Time.deltaTime;
 
+        if (water.transform.position.y != waterYTarget)
+        {
+            var waterYposition = Mathf.Lerp(water.transform.position.y, waterYTarget, Time.deltaTime * waterRiseSpeed);
+            water.transform.position = new Vector3(water.transform.position.x, waterYposition, water.transform.position.z);
+
+            if (waterYTarget - waterYposition < 0.01f)
+                water.transform.position = new Vector3(water.transform.position.x, waterYTarget, water.transform.position.z);
+        }
+
         if (gameState != GameState.Active)
             return;
 
@@ -140,7 +160,8 @@ public class GameController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Alpha4))
             SetCurrentTileTypeIndex(3);
 
-        inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
+        var position = new Vector3(Input.mousePosition.x, Input.mousePosition.y, 0);
+        inputRay = mainCamera.ScreenPointToRay(position);
         hitMapObject = null;
 
         if (Input.mousePosition.y > 128 && Input.mousePosition.y < Screen.height - 96 && Physics.Raycast(inputRay, out var hit, Mathf.Infinity))
@@ -213,13 +234,27 @@ public class GameController : MonoBehaviour
         previousSecond = remainingSeconds;
     }
 
-    public void OnClickPlayButton() => SetGameState(GameState.Active);
+    public void OnClickPlayButton()
+    {
+        SetGameState(GameState.Active);
+    }
 
-    public void OnClickMenuButton() => SetGameState(GameState.Menu);
+    public void OnClickMenuButton()
+    {
+        audioSource.PlayOneShot(clipClick);
+        SetGameState(GameState.Menu);
+    }
 
-    public void OnClickInfoButton() => uiInfoPanel.SetActive(!uiInfoPanel.activeSelf);
+    public void OnClickInfoButton()
+    {
+        audioSource.PlayOneShot(clipClick);
+        uiInfoPanel.SetActive(!uiInfoPanel.activeSelf);
+    }
 
-    public void OnClickSkipYearButton() => SetYear(currentYear + 1);
+    public void OnClickSkipYearButton()
+    {
+        SetYear(currentYear + 1);
+    }
 
     public void SetCurrentTileTypeIndex(int index)
     {
@@ -477,7 +512,7 @@ public class GameController : MonoBehaviour
         {
             SetMapTile(x, y, z, objectDef.tileType, MapObjectState.Complete, 0);
             particleSystemBuildingComplete.transform.position = new Vector3(x, y, z);
-            particleSystemBuildingComplete.Play();
+            particleSystemBuildingComplete.Emit(10);
         }
         else
         {
@@ -487,6 +522,8 @@ public class GameController : MonoBehaviour
         DrawMapTile(x, y, z);
         SetEnergy(energy - objectDef.buildCostEnergy, true);
         SetWood(wood - objectDef.buildCostWood, true);
+
+        audioSource.PlayOneShot(clipAddObject);
 
         return true;
     }
@@ -506,7 +543,7 @@ public class GameController : MonoBehaviour
         {
             SetEnergy(energy + existingMapObjectDef.buildCostEnergy, true);
             SetWood(wood + existingMapObjectDef.buildCostWood, true);
-            SetMapTile(x, y, z, TileType.Empty, MapObjectState.Complete, 0);
+            SetEmptyMapTile(x, y, z, existingMapObjectDef.gridSize);
         }
         else if (existingMapObject.State == MapObjectState.Demolishing)
         {
@@ -535,6 +572,8 @@ public class GameController : MonoBehaviour
         }
 
         DrawMapTile(x, y, z);
+
+        audioSource.PlayOneShot(clipRemoveObject);
 
         return true;
     }
@@ -603,10 +642,14 @@ public class GameController : MonoBehaviour
         {
             waterLevel += 1;
             textWaterRises.alpha = 2;
+            audioSourceQuiet.PlayOneShot(clipWaterRise);
+        }
+        else
+        {
+            audioSource.PlayOneShot(clipNextYear);
         }
 
-        water.transform.position = new Vector3(water.transform.position.x, waterLevel, water.transform.position.z);
-
+        waterYTarget = waterLevel - 0.1f;
         cameraController.minY = waterLevel + 1f;
 
         var woodGain = 0;
@@ -642,6 +685,8 @@ public class GameController : MonoBehaviour
                                     {
                                         woodGain += MapObjectSettings.Instance.mapObjectDefinitions[(int)mapData[x, y, z]].woodFromDestruction;
                                         SetMapTile(x, y, z, TileType.Empty, MapObjectState.Complete, 0);
+                                        particleSystemBuildingRemoved.transform.position = new Vector3(x, y, z);
+                                        particleSystemBuildingRemoved.Emit(5);
                                     }
                                     DrawMapTile(x, y, z);
                                 }
@@ -660,7 +705,6 @@ public class GameController : MonoBehaviour
             SetGameState(GameState.GameOver);
         }
     }
-
 
     private void SetGameState(GameState state)
     {
@@ -702,6 +746,8 @@ public class GameController : MonoBehaviour
 
                     textHousesLost.text = $"HOUSES FLOODED: {housesLost}";
                     textFarmsLost.text = $"FARMS FLOODED: {farmsLost}";
+
+                    audioSourceQuiet.PlayOneShot(clipGameOver);
                 } break;
         }
 
@@ -720,6 +766,8 @@ public class GameController : MonoBehaviour
         SetWood(0, false);
         SetYear(1);
         CountScores();
+        waterYTarget = waterLevel - 0.1f;
+        water.transform.position = new Vector3(water.transform.position.x, waterYTarget, water.transform.position.z);
     }
 
     private void SetAllMapData(int[] newData)
@@ -764,6 +812,29 @@ public class GameController : MonoBehaviour
                     }
 
                     mapObjects[newX, newY, newZ].SetTile(tileType, state, yearDelay);
+                }
+            }
+        }
+    }
+
+    private void SetEmptyMapTile(int x, int y, int z, int gridSize)
+    {
+        for (var xExtent = 0; xExtent < gridSize; ++xExtent)
+        {
+            for (var yExtent = 0; yExtent < gridSize; ++yExtent)
+            {
+                for (var zExtent = 0; zExtent < gridSize; ++zExtent)
+                {
+                    var newX = x + xExtent;
+                    var newY = y + yExtent;
+                    var newZ = z + zExtent;
+
+                    if (IsValidMapIndex(newX, newY, newZ) == false)
+                        return;
+
+                    mapData[newX, newY, newZ] = TileType.Empty;
+
+                    mapObjects[newX, newY, newZ].SetTile(TileType.Empty, MapObjectState.Complete, 0);
                 }
             }
         }
