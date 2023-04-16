@@ -14,7 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mapObjectDefinitions:
   - tileType: 0
-    iconColor: {r: 0, g: 0, b: 0, a: 0}
     mesh: {fileID: 0}
     material: {fileID: 0}
     offset: {x: 0, y: 0, z: 0}
@@ -29,7 +28,6 @@ MonoBehaviour:
     woodFromDestruction: 0
     woodFromBuilding: 0
   - tileType: 1
-    iconColor: {r: 0.1254902, g: 1, b: 0, a: 1}
     mesh: {fileID: -2477511411847689622, guid: fca438ca0d0fc43a2a97983024fc6b53, type: 3}
     material: {fileID: 2100000, guid: 2ac704b0ccd90420394fc018a579f47c, type: 2}
     offset: {x: 0, y: 0, z: 0}
@@ -44,7 +42,6 @@ MonoBehaviour:
     woodFromDestruction: 0
     woodFromBuilding: 0
   - tileType: 2
-    iconColor: {r: 0.05490196, g: 0.43529412, b: 0, a: 1}
     mesh: {fileID: -3877841677461667978, guid: ff958687a533ccb4684a89286e9e6e8d, type: 3}
     material: {fileID: 2100000, guid: 0c2b8add5b7733843a6c16fb41325646, type: 2}
     offset: {x: 0, y: -0.5, z: 0}
@@ -59,54 +56,64 @@ MonoBehaviour:
     woodFromDestruction: 1
     woodFromBuilding: 0
   - tileType: 3
-    iconColor: {r: 1, g: 0.56078434, b: 0, a: 1}
     mesh: {fileID: 4300000, guid: e36cf732b73e87f458b5e69d2c1f6417, type: 3}
     material: {fileID: 2100000, guid: c79030977bbf33e4397f1417b86e5789, type: 2}
-    offset: {x: 0, y: -0.5, z: 0}
-    scale: {x: 0.11, y: 0.11, z: 0.11}
+    offset: {x: 0.5, y: -0.5, z: 0.5}
+    scale: {x: 0.2, y: 0.2, z: 0.2}
     rotation: {x: 270, y: 0, z: 0}
-    gridSize: 1
-    buildCostEnergy: 1
-    buildCostWood: 1
-    removeCost: 1
+    gridSize: 2
+    buildCostEnergy: 2
+    buildCostWood: 3
+    removeCost: 2
     buildTime: 1
     removeTime: 1
     woodFromDestruction: 0
     woodFromBuilding: 0
   - tileType: 4
-    iconColor: {r: 0.5411765, g: 0.5647059, b: 0.5372549, a: 1}
     mesh: {fileID: -6244881048818478901, guid: bacdb87a78a3ca847a674df0ff9c059b, type: 3}
     material: {fileID: 2100000, guid: ea92d207446100144b68868b9074318c, type: 2}
     offset: {x: 0, y: -0.5, z: 0}
     scale: {x: 0.7, y: 1, z: 0.6}
     rotation: {x: 0, y: 0, z: 0}
     gridSize: 1
-    buildCostEnergy: 9999
+    buildCostEnergy: 0
     buildCostWood: 0
-    removeCost: 5
+    removeCost: 9999
     buildTime: 0
     removeTime: 1
     woodFromDestruction: 0
     woodFromBuilding: 0
   - tileType: 5
-    iconColor: {r: 0.9764706, g: 1, b: 0.078431375, a: 1}
     mesh: {fileID: -1726349386409795862, guid: 916d62e65fcf3304e94e3f01766d6d5c, type: 3}
     material: {fileID: 2100000, guid: 7962849707b521949854feffac24e086, type: 2}
     offset: {x: 0, y: -0.5, z: 0}
     scale: {x: 2, y: 2, z: 2}
     rotation: {x: 0, y: 0, z: 0}
     gridSize: 1
-    buildCostEnergy: 1
+    buildCostEnergy: 2
     buildCostWood: 0
-    removeCost: 1
+    removeCost: 2
     buildTime: 1
     removeTime: 1
     woodFromDestruction: 0
     woodFromBuilding: 0
   - tileType: 6
-    iconColor: {r: 0.99607843, g: 1, b: 0.79607844, a: 1}
     mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 45e8d372142add140895736c5d6b8bd9, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    rotation: {x: 0, y: 0, z: 0}
+    gridSize: 1
+    buildCostEnergy: 9999
+    buildCostWood: 0
+    removeCost: 0
+    buildTime: 0
+    removeTime: 0
+    woodFromDestruction: 0
+    woodFromBuilding: 0
+  - tileType: 7
+    mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 88a5f2284dc97f94285b527cfc6f0bcd, type: 2}
     offset: {x: 0, y: 0, z: 0}
     scale: {x: 1, y: 1, z: 1}
     rotation: {x: 0, y: 0, z: 0}

@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class MapObject : MonoBehaviour
 {
+    public TileType TileType { get; private set; }
     public MapObjectState State { get; private set; }
 
     public int yearsRemaining;
@@ -23,8 +24,9 @@ public class MapObject : MonoBehaviour
         gameObject.transform.position = new Vector3(x, y, z);
     }
 
-    public void SetState(MapObjectState state, int buildTime)
+    public void SetTile(TileType tileType, MapObjectState state, int buildTime)
     {
+        TileType = tileType;
         State = state;
         yearsRemaining = buildTime;
     }

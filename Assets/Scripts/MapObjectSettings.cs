@@ -13,7 +13,6 @@ public class MapObjectSettings : ScriptableObject
 public struct MapObjectDefinition
 {
     public TileType tileType;
-    public Color iconColor;
     public Mesh mesh;
     public Material material;
     public Vector3 offset;

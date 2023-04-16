@@ -15,6 +15,7 @@ public enum TileType
     House,
     Stone,
     Farm,
+    Seafloor,
     Invisible
 }
 
