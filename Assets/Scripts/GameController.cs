@@ -13,18 +13,11 @@ public class GameController : MonoBehaviour
     public int mapSizeY;
     public int mapSizeZ;
     public int secondsInYear;
-    public int currentYear;
     public int maxYears;
     public int waterRiseYears;
-    public int waterLevel;
-    public int energy;
     public int energyPerLevel;
-    public int wood;
-    public int houses;
     public int houseGoal;
-    public int farms;
     public int farmGoal;
-
 
     [SerializeField] private SimpleCameraController cameraController;
     [SerializeField] private Transform cameraStartTransform;
@@ -46,6 +39,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textHousesLost;
     [SerializeField] private TextMeshProUGUI textFarmsLost;
     [SerializeField] private TextMeshProUGUI textGameplayInfo;
+    [SerializeField] private TextMeshProUGUI textWaterRises;
     [SerializeField] private Slider sliderTimeInYear;
     [SerializeField] private Slider sliderMaxYears;
     [SerializeField] private GameObject water;
@@ -55,7 +49,13 @@ public class GameController : MonoBehaviour
     [SerializeField] private ParticleSystem particleSystemBuildingComplete;
     [SerializeField] private GameObject hotkeyButtonsPanel;
     [SerializeField] private GameObject[] hotkeyButtons;
-    
+
+    private int currentYear;
+    private int waterLevel;
+    private int farms;
+    private int energy;
+    private int wood;
+    private int houses;
     private bool infiniteTime;
     private float timer;
     private int previousSecond;
@@ -114,8 +114,12 @@ public class GameController : MonoBehaviour
         if (textWoodDelta.alpha > 0)
             textWoodDelta.alpha -= Time.deltaTime;
 
+        if (textWaterRises.alpha > 0)
+            textWaterRises.alpha -= Time.deltaTime;
+
         if (gameState != GameState.Active)
             return;
+
 #if UNITY_EDITOR
         if (Input.GetKeyDown(KeyCode.P))
             SaveMapToClipboard();
@@ -123,6 +127,7 @@ public class GameController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.L))
             LoadMap();
 #endif
+
         if (Input.GetKeyDown(KeyCode.Alpha1))
             SetCurrentTileTypeIndex(0);
 
@@ -134,12 +139,6 @@ public class GameController : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Alpha4))
             SetCurrentTileTypeIndex(3);
-
-        if (Input.GetKeyDown(KeyCode.Alpha5))
-            SetCurrentTileTypeIndex(4);
-
-        if (Input.GetKeyDown(KeyCode.Alpha6))
-            SetCurrentTileTypeIndex(5);
 
         inputRay = mainCamera.ScreenPointToRay(Input.mousePosition);
         hitMapObject = null;
@@ -237,8 +236,6 @@ public class GameController : MonoBehaviour
             case 0: currentTileTypeIndex = 1; break;
             case 1: currentTileTypeIndex = 3; break;
             case 2: currentTileTypeIndex = 5; break;
-           // case 3: currentTileTypeIndex = 2; break;
-          //  case 5: currentTileTypeIndex = 4; break;
         }
 
         var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
@@ -319,19 +316,10 @@ public class GameController : MonoBehaviour
 
         var objectDef = MapObjectSettings.Instance.mapObjectDefinitions[currentTileTypeIndex];
 
-        switch (buildMode)
-        {
-            case BuildMode.Add:
-                {
-                    objectIndicator.SetVisuals(objectDef.mesh, materialBuildModeAdd, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
-                }
-                break;
-            case BuildMode.Remove:
-                {
-                    objectIndicator.SetVisuals(meshCube, materialBuildModeRemove, Vector3.zero, Vector3.one, Quaternion.identity);
-                }
-                break;
-        }
+        if (buildMode == BuildMode.Add)
+            objectIndicator.SetVisuals(objectDef.mesh, materialBuildModeAdd, objectDef.offset, objectDef.scale, Quaternion.Euler(objectDef.rotation));
+        else
+            objectIndicator.SetVisuals(meshCube, materialBuildModeRemove, Vector3.zero, Vector3.one, Quaternion.identity);
     }
 
     private bool CanBuildOnTop(int x, int z, TileType selectedTile, out int yIndex)
@@ -614,6 +602,7 @@ public class GameController : MonoBehaviour
         if (currentYear % waterRiseYears == 0)
         {
             waterLevel += 1;
+            textWaterRises.alpha = 2;
         }
 
         water.transform.position = new Vector3(water.transform.position.x, waterLevel, water.transform.position.z);
@@ -726,41 +715,12 @@ public class GameController : MonoBehaviour
 
     private void ResetGame()
     {
-        //SetAllMapData(TileType.Empty);
-        //SetLayerMapData(TileType.Invisible, 0);
-        //SetLayerMapData(TileType.Ground, 1);
-        //DrawAllMap();
         LoadMap();
         waterLevel = 1;
         SetWood(0, false);
         SetYear(1);
         CountScores();
     }
-
-    //private void SetAllMapData(TileType tileType)
-    //{
-    //    for (var x = 0; x < mapSizeX; ++x)
-    //    {
-    //        for (var y = 0; y < mapSizeY; ++y)
-    //        {
-    //            for (var z = 0; z < mapSizeZ; ++z)
-    //            {
-    //                SetMapTile(x, y, z, tileType);
-    //            }
-    //        }
-    //    }
-    //}
-
-    //private void SetLayerMapData(TileType tileType, int y)
-    //{
-    //    for (var x = 0; x < mapSizeX; ++x)
-    //    {
-    //        for (var z = 0; z < mapSizeZ; ++z)
-    //        {
-    //            SetMapTile(x, y, z, tileType);
-    //        }
-    //    }
-    //}
 
     private void SetAllMapData(int[] newData)
     {
